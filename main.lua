@@ -9,17 +9,11 @@ local EstrogenScript = [[
     local Camera = workspace.CurrentCamera
 
     _G.Settings = {
-        SnapAim = false,
-        BlatantMode = false,
-        Strength = 5,
-        FOV = 150,
-        ESP = false,
-        InfJump = false,
-        Speed = 16,
+        SnapAim = false, BlatantMode = false, Strength = 5,
+        FOV = 150, ESP = false, InfJump = false, Speed = 16,
         ConfigName = "Default"
     }
 
-    -- Overhauled Config Logic
     local function SaveConfig(name)
         local path = "EW_" .. (name or _G.Settings.ConfigName) .. ".json"
         writefile(path, HttpService:JSONEncode(_G.Settings))
@@ -35,7 +29,9 @@ local EstrogenScript = [[
         return false
     end
 
-    -- Aim Engine
+    local FOVCircle = Drawing.new("Circle")
+    FOVCircle.Thickness, FOVCircle.Color, FOVCircle.Transparency = 1, Color3.fromRGB(245, 169, 184), 1
+
     local function GetTarget()
         local target, dist = nil, _G.Settings.FOV
         for _, p in pairs(Players:GetPlayers()) do
@@ -51,16 +47,19 @@ local EstrogenScript = [[
         return target
     end
 
-    RunService.RenderStepped:Connect(function()
+    local Connections = {}
+    table.insert(Connections, RunService.RenderStepped:Connect(function()
+        FOVCircle.Radius = _G.Settings.FOV
+        FOVCircle.Position = UserInputService:GetMouseLocation()
+        FOVCircle.Visible = _G.Settings.SnapAim
+
         if _G.Settings.SnapAim and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
             local t = GetTarget()
             if t then
                 local tPos = Camera:WorldToViewportPoint(t.Position)
                 local mPos = UserInputService:GetMouseLocation()
-                local moveX = (tPos.X - mPos.X)
-                local moveY = (tPos.Y - mPos.Y)
-                local power = _G.Settings.BlatantMode and 1 or (_G.Settings.Strength / 50) -- Nerfed for stability
-                if mousemoverel then mousemoverel(moveX * power, moveY * power) end
+                local power = _G.Settings.BlatantMode and 1 or (_G.Settings.Strength / 50)
+                if mousemoverel then mousemoverel((tPos.X - mPos.X) * power, (tPos.Y - mPos.Y) * power) end
             end
         end
         if _G.Settings.InfJump and UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -69,19 +68,18 @@ local EstrogenScript = [[
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.WalkSpeed = _G.Settings.Speed
         end
-    end)
+    end))
 
-    -- UI System
     function Library:Init()
         local Gui = Instance.new("ScreenGui", CoreGui)
         local Main = Instance.new("Frame", Gui)
-        Main.Size, Main.Position = UDim2.new(0, 520, 0, 360), UDim2.new(0.5, -260, 0.5, -180)
+        Main.Size, Main.Position = UDim2.new(0, 520, 0, 380), UDim2.new(0.5, -260, 0.5, -190)
         Main.BackgroundColor3, Main.BorderSizePixel = Color3.fromRGB(20, 20, 25), 0
         Main.Active, Main.Draggable, Main.Visible = true, true, false
 
-        UserInputService.InputBegan:Connect(function(i, p)
+        table.insert(Connections, UserInputService.InputBegan:Connect(function(i, p)
             if not p and i.KeyCode == Enum.KeyCode.RightShift then Main.Visible = not Main.Visible end
-        end)
+        end))
 
         local Side = Instance.new("Frame", Main)
         Side.Size, Side.BackgroundColor3 = UDim2.new(0, 140, 1, 0), Color3.fromRGB(25, 25, 30)
@@ -93,7 +91,7 @@ local EstrogenScript = [[
         Title.TextColor3, Title.BackgroundTransparency = Color3.new(1,1,1), 1
 
         local TabContainer = Instance.new("Frame", Side)
-        TabContainer.Position, TabContainer.Size = UDim2.new(0, 5, 0, 60), UDim2.new(1, -10, 1, -120)
+        TabContainer.Position, TabContainer.Size = UDim2.new(0, 5, 0, 60), UDim2.new(1, -10, 1, -130)
         TabContainer.BackgroundTransparency = 1
         Instance.new("UIListLayout", TabContainer).Padding = UDim.new(0, 5)
 
@@ -129,32 +127,25 @@ local EstrogenScript = [[
             function El:Slider(txt, key, min, max)
                 local sFrame = Instance.new("Frame", Page)
                 sFrame.Size, sFrame.BackgroundColor3 = UDim2.new(1, -10, 0, 45), Color3.fromRGB(25, 25, 30)
-                
                 local label = Instance.new("TextLabel", sFrame)
                 label.Size, label.Position, label.Text = UDim2.new(1, 0, 0, 20), UDim2.new(0, 5, 0, 0), txt .. ": " .. _G.Settings[key]
                 label.TextColor3, label.BackgroundTransparency, label.Font, label.TextXAlignment = Color3.new(1,1,1), 1, Enum.Font.Code, Enum.TextXAlignment.Left
-
                 local container = Instance.new("Frame", sFrame)
-                container.Size, container.Position = UDim2.new(1, -10, 0, 15), UDim2.new(0, 5, 0, 22)
+                container.Size, container.Position = UDim2.new(1, -10, 0, 12), UDim2.new(0, 5, 0, 25)
                 container.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
-
                 local fill = Instance.new("Frame", container)
-                fill.BackgroundColor3 = Color3.fromRGB(245, 169, 184)
-                fill.BorderSizePixel = 0
-
+                fill.BackgroundColor3, fill.BorderSizePixel = Color3.fromRGB(245, 169, 184), 0
                 local function Update()
                     local percent = math.clamp((_G.Settings[key] - min) / (max - min), 0, 1)
                     fill.Size = UDim2.new(percent, 0, 1, 0)
                     label.Text = txt .. ": " .. tostring(_G.Settings[key])
                 end
-
                 container.InputBegan:Connect(function(input)
                     if input.UserInputType == Enum.UserInputType.MouseButton1 then
                         local conn; conn = RunService.RenderStepped:Connect(function()
                             if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then conn:Disconnect() return end
                             local mPos = UserInputService:GetMouseLocation().X - container.AbsolutePosition.X
-                            local val = math.round(min + (max - min) * math.clamp(mPos / container.AbsoluteSize.X, 0, 1))
-                            _G.Settings[key] = val
+                            _G.Settings[key] = math.round(min + (max - min) * math.clamp(mPos / container.AbsoluteSize.X, 0, 1))
                             Update()
                         end)
                     end
@@ -165,8 +156,7 @@ local EstrogenScript = [[
             function El:TextBox(txt, key, cb)
                 local t = Instance.new("TextBox", Page)
                 t.Size, t.BackgroundColor3 = UDim2.new(1, -10, 0, 30), Color3.fromRGB(30, 30, 35)
-                t.Text, t.PlaceholderText = _G.Settings[key], txt
-                t.TextColor3, t.Font = Color3.new(1,1,1), Enum.Font.Code
+                t.Text, t.PlaceholderText, t.TextColor3, t.Font = _G.Settings[key], txt, Color3.new(1,1,1), Enum.Font.Code
                 t.FocusLost:Connect(function() _G.Settings[key] = t.Text; if cb then cb() end end)
             end
 
@@ -176,27 +166,26 @@ local EstrogenScript = [[
                 b.TextColor3, b.Font = Color3.new(1,1,1), Enum.Font.Code
                 b.MouseButton1Click:Connect(cb)
             end
-
             return El
         end
+
+        local Unload = Instance.new("TextButton", Side)
+        Unload.Size, Unload.Position = UDim2.new(1, -10, 0, 35), UDim2.new(0, 5, 1, -40)
+        Unload.BackgroundColor3, Unload.Text = Color3.fromRGB(245, 169, 184), "UNLOAD"
+        Unload.Font, Unload.TextColor3, Unload.TextSize = Enum.Font.Code, Color3.new(1,1,1), 14
+        Unload.MouseButton1Click:Connect(function()
+            for _, c in pairs(Connections) do c:Disconnect() end
+            Gui:Destroy(); FOVCircle:Remove()
+        end)
+
         return Library
     end
 
     local UI = Library:Init()
-    local C = UI:NewTab("Combat")
-    C:Toggle("Enable Snap", "SnapAim")
-    C:Toggle("Blatant Mode", "BlatantMode")
-    C:Slider("Strength", "Strength", 1, 50)
-    C:Slider("FOV", "FOV", 10, 800)
-
-    local M = UI:NewTab("Misc")
-    M:Toggle("Inf Jump", "InfJump")
-    M:Slider("Walkspeed", "Speed", 16, 200)
-
-    local S = UI:NewTab("Settings")
-    S:TextBox("Profile Name", "ConfigName")
-    S:Button("Save Profile", function() SaveConfig() end)
-    S:Button("Load Profile", function() LoadConfig(_G.Settings.ConfigName) end)
+    local C = UI:NewTab("Combat"); C:Toggle("Enable Snap", "SnapAim"); C:Toggle("Blatant Mode", "BlatantMode")
+    C:Slider("Strength", "Strength", 1, 50); C:Slider("FOV", "FOV", 10, 800)
+    local M = UI:NewTab("Misc"); M:Toggle("Inf Jump", "InfJump"); M:Slider("Walkspeed", "Speed", 16, 200)
+    local S = UI:NewTab("Settings"); S:TextBox("Profile Name", "ConfigName"); S:Button("Save Profile", function() SaveConfig() end); S:Button("Load Profile", function() LoadConfig(_G.Settings.ConfigName) end)
 ]]
 
 local Loader = [[ repeat task.wait() until game:IsLoaded(); task.wait(1); ]] .. EstrogenScript
