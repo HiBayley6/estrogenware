@@ -51,7 +51,6 @@ local EstrogenScript = [[
     table.insert(Connections, RunService.RenderStepped:Connect(function()
         FOVCircle.Radius = _G.Settings.FOV
         FOVCircle.Position = UserInputService:GetMouseLocation()
-        -- The Fix: Toggle visibility based on ShowFOV setting
         FOVCircle.Visible = (_G.Settings.SnapAim and _G.Settings.ShowFOV)
 
         if _G.Settings.SnapAim and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
@@ -103,6 +102,7 @@ local EstrogenScript = [[
         function Library:NewTab(name)
             local Page = Instance.new("ScrollingFrame", Content)
             Page.Size, Page.Visible, Page.BackgroundTransparency, Page.ScrollBarThickness = UDim2.new(1,0,1,0), false, 1, 0
+            Page.CanvasSize = UDim2.new(0,0,1.5,0) -- Extra space to prevent cutting off toggles
             Instance.new("UIListLayout", Page).Padding = UDim.new(0, 8)
 
             local b = Instance.new("TextButton", TabContainer)
@@ -183,10 +183,21 @@ local EstrogenScript = [[
     end
 
     local UI = Library:Init()
-    local C = UI:NewTab("Combat"); C:Toggle("Enable Snap", "SnapAim"); C:Toggle("Show FOV", "ShowFOV"); C:Toggle("Blatant Mode", "BlatantMode")
-    C:Slider("Strength", "Strength", 1, 50); C:Slider("FOV", "FOV", 10, 800)
-    local M = UI:NewTab("Misc"); M:Toggle("Inf Jump", "InfJump"); M:Slider("Walkspeed", "Speed", 16, 200)
-    local S = UI:NewTab("Settings"); S:TextBox("Profile Name", "ConfigName"); S:Button("Save Profile", function() SaveConfig() end); S:Button("Load Profile", function() LoadConfig(_G.Settings.ConfigName) end)
+    local C = UI:NewTab("Combat")
+    C:Toggle("Enable Snap", "SnapAim")
+    C:Toggle("Show FOV Circle", "ShowFOV") -- This is the one!
+    C:Toggle("Blatant Mode", "BlatantMode")
+    C:Slider("Strength", "Strength", 1, 50)
+    C:Slider("FOV Size", "FOV", 10, 800)
+
+    local M = UI:NewTab("Misc")
+    M:Toggle("Inf Jump", "InfJump")
+    M:Slider("Walkspeed", "Speed", 16, 200)
+
+    local S = UI:NewTab("Settings")
+    S:TextBox("Profile Name", "ConfigName")
+    S:Button("Save Profile", function() SaveConfig() end)
+    S:Button("Load Profile", function() LoadConfig(_G.Settings.ConfigName) end)
 ]]
 
 local Loader = [[ repeat task.wait() until game:IsLoaded(); task.wait(1); ]] .. EstrogenScript
