@@ -10,7 +10,7 @@ local EstrogenScript = [[
 
     _G.Settings = {
         SnapAim = false, BlatantMode = false, Strength = 5,
-        FOV = 150, ESP = false, InfJump = false, Speed = 16,
+        FOV = 150, ShowFOV = true, ESP = false, InfJump = false, Speed = 16,
         ConfigName = "Default"
     }
 
@@ -51,7 +51,8 @@ local EstrogenScript = [[
     table.insert(Connections, RunService.RenderStepped:Connect(function()
         FOVCircle.Radius = _G.Settings.FOV
         FOVCircle.Position = UserInputService:GetMouseLocation()
-        FOVCircle.Visible = _G.Settings.SnapAim
+        -- The Fix: Toggle visibility based on ShowFOV setting
+        FOVCircle.Visible = (_G.Settings.SnapAim and _G.Settings.ShowFOV)
 
         if _G.Settings.SnapAim and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
             local t = GetTarget()
@@ -182,7 +183,7 @@ local EstrogenScript = [[
     end
 
     local UI = Library:Init()
-    local C = UI:NewTab("Combat"); C:Toggle("Enable Snap", "SnapAim"); C:Toggle("Blatant Mode", "BlatantMode")
+    local C = UI:NewTab("Combat"); C:Toggle("Enable Snap", "SnapAim"); C:Toggle("Show FOV", "ShowFOV"); C:Toggle("Blatant Mode", "BlatantMode")
     C:Slider("Strength", "Strength", 1, 50); C:Slider("FOV", "FOV", 10, 800)
     local M = UI:NewTab("Misc"); M:Toggle("Inf Jump", "InfJump"); M:Slider("Walkspeed", "Speed", 16, 200)
     local S = UI:NewTab("Settings"); S:TextBox("Profile Name", "ConfigName"); S:Button("Save Profile", function() SaveConfig() end); S:Button("Load Profile", function() LoadConfig(_G.Settings.ConfigName) end)
