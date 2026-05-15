@@ -1,5 +1,6 @@
--- EstrogenWare V56 Persistence Override (Solara Compatibility Patch)
--- Fixed: Tab switching logic restored + Strict Bottom-Anchored Config Tools + Removed listfiles dependancy
+-- EstrogenWare V56 Persistence Override (Solara Framework Integration)
+-- Fixed: Execution Context, CoreGui Sandbox Access, Vector2 Math Errors, and Complete Module Unloading
+-- Added: Line-Based Skeleton ESP Module
 
 local LogService = game:GetService("LogService")
 local CoreGui = game:GetService("CoreGui")
@@ -13,18 +14,14 @@ local function RunSource()
         local RunService = game:GetService("RunService")
         local Players = game:GetService("Players")
         local LocalPlayer = Players.LocalPlayer
-        local CoreGui = game:GetService("CoreGui")
-
+        
         -- Solara Environment Fallback Layer
-        local mousemoverel = mousemoverel or (Input and Input.MouseMove) or function(x, y)
-            -- Alternative input simulation proxy if standard global missing
-            local mouse = LocalPlayer:GetMouse()
-            -- Note: Standard mousemoverel injection expected from executor core
-        end
+        local CoreGui = game:GetService("CoreGui")
+        local TargetFolder = LocalPlayer:FindFirstChildOfClass("PlayerGui") or CoreGui
 
         -- Config Logic
         getgenv().Settings = getgenv().Settings or {
-            SnapAim = false, ShowFOV = true, Blatant = false, ESP = false,
+            SnapAim = false, ShowFOV = true, Blatant = false, ESP = false, SkeletonESP = false,
             FOV = 150, Smoothing = 15
         }
 
@@ -34,14 +31,33 @@ local function RunSource()
         end
 
         -- UI Build
-        if CoreGui:FindFirstChild("EstrogenWare") then CoreGui.EstrogenWare:Destroy() end
-        local Gui = Instance.new("ScreenGui", CoreGui); Gui.Name = "EstrogenWare"
+        if TargetFolder:FindFirstChild("EstrogenWare") then TargetFolder.EstrogenWare:Destroy() end
+        local Gui = Instance.new("ScreenGui", TargetFolder); Gui.Name = "EstrogenWare"
+        Gui.ResetOnSpawn = false
         
         local Main = Instance.new("Frame", Gui)
         Main.Size = UDim2.new(0, 520, 0, 380)
-        Main.Position = UDim2.new(1, -530, 0, 50) 
-        Main.BackgroundColor3 = Color3.new(1,1,1); Main.BorderSizePixel = 0; Main.Active = true; Main.Draggable = true
-        Main.Visible = false 
+        Main.Position = UDim2.new(0.5, -260, 0.5, -190) 
+        Main.BackgroundColor3 = Color3.new(1,1,1); Main.BorderSizePixel = 0; Main.Active = true
+        Main.Visible = true 
+
+        -- Standard Dragging Fix for Solara Container Limits
+        local dragging, dragInput, dragStart, startPos
+        Main.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true; dragStart = input.Position; startPos = Main.Position
+                input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+            end
+        end)
+        Main.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
 
         local function ApplyPride(obj)
             local g = Instance.new("UIGradient", obj)
@@ -75,6 +91,7 @@ local function RunSource()
             local Page = Instance.new("Frame", ContentContainer); Page.Size = UDim2.new(1, 0, 1, 0); Page.Visible = false; Page.BackgroundTransparency = 1; Page.Name = name
             
             btn.MouseButton1Click:Connect(function() 
+                Home.Visible = false
                 for _, v in pairs(ContentContainer:GetChildren()) do 
                     if v:IsA("Frame") then v.Visible = false end 
                 end 
@@ -108,9 +125,9 @@ local function RunSource()
         end
 
         local Combat = NewTab("Combat"); AddToggle(Combat, "Aimlock", "SnapAim"); AddToggle(Combat, "Blatant", "Blatant"); AddSlider(Combat, "Smoothing", "Smoothing", 1, 100)
-        local Visuals = NewTab("Visuals"); AddToggle(Visuals, "Highlight ESP", "ESP"); AddToggle(Visuals, "Show FOV", "ShowFOV"); AddSlider(Visuals, "FOV Size", "FOV", 10, 800)
+        local Visuals = NewTab("Visuals"); AddToggle(Visuals, "Highlight ESP", "ESP"); AddToggle(Visuals, "Skeleton ESP", "SkeletonESP"); AddToggle(Visuals, "Show FOV", "ShowFOV"); AddSlider(Visuals, "FOV Size", "FOV", 10, 800)
         
-        -- CONFIG TAB (Solara Compatible Implementation)
+        -- CONFIG TAB (Dynamic Tracker)
         local Configs = NewTab("Configs")
         local ConfigScroll = Instance.new("ScrollingFrame", Configs); ConfigScroll.Size = UDim2.new(1, -5, 1, -90); ConfigScroll.BackgroundTransparency = 1; ConfigScroll.ScrollBarThickness = 2; ConfigScroll.BorderSizePixel = 0
         Instance.new("UIListLayout", ConfigScroll).Padding = UDim.new(0, 5)
@@ -119,13 +136,11 @@ local function RunSource()
         local ConfigName = Instance.new("TextBox", CreateContainer); ConfigName.Size = UDim2.new(1, 0, 0, 35); ConfigName.BackgroundColor3 = Color3.new(1,1,1); ConfigName.PlaceholderText = "Config Name..."; ConfigName.Text = ""; ConfigName.Font = Enum.Font.RobotoMono; ConfigName.TextColor3 = Color3.new(0,0,0); ConfigName.BorderSizePixel = 0; ApplyPride(ConfigName)
         local SaveBtn = Instance.new("TextButton", CreateContainer); SaveBtn.Size = UDim2.new(1, 0, 0, 35); SaveBtn.Position = UDim2.new(0, 0, 0, 40); SaveBtn.BackgroundColor3 = Color3.new(1,1,1); SaveBtn.Text = "CREATE CONFIG"; SaveBtn.Font = Enum.Font.RobotoMono; SaveBtn.BorderSizePixel = 0; ApplyPride(SaveBtn)
         
-        -- Fallback dynamic file tracking mapping since listfiles is missing on Solara
         local TrackedConfigs = getgenv().EW_TrackedConfigs or {}
         getgenv().EW_TrackedConfigs = TrackedConfigs
 
         local function RefreshConfigs()
             for _, v in pairs(ConfigScroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
-            
             for file, _ in pairs(TrackedConfigs) do
                 local row = Instance.new("Frame", ConfigScroll); row.Size = UDim2.new(1, 0, 0, 30); row.BackgroundTransparency = 1; row.BorderSizePixel = 0
                 local load = Instance.new("TextButton", row); load.Size = UDim2.new(0.8, -5, 1, 0); load.Text = file; load.Font = Enum.Font.RobotoMono; load.BackgroundColor3 = Color3.new(1,1,1); load.BorderSizePixel = 0; ApplyPride(load)
@@ -160,50 +175,144 @@ local function RunSource()
 
         local UnloadBtn = Instance.new("TextButton", Side); UnloadBtn.Size = UDim2.new(1, -10, 0, 45); UnloadBtn.Position = UDim2.new(0, 5, 1, -50); UnloadBtn.BackgroundColor3 = Color3.new(1,1,1); UnloadBtn.Text = "UNLOAD"; UnloadBtn.Font = Enum.Font.RobotoMono; UnloadBtn.TextColor3 = Color3.fromRGB(30,30,30); UnloadBtn.BorderSizePixel = 0; ApplyPride(UnloadBtn)
 
-        -- Mechanics
+        -- Drawing API Cache
         local FOVDraw = Drawing.new("Circle")
-        
+        local Skeletons = {}
+
+        local function ClearDrawings()
+            pcall(function() FOVDraw:Remove() end)
+            for _, cache in pairs(Skeletons) do
+                for _, line in pairs(cache) do pcall(function() line:Remove() end) end
+            end
+            Skeletons = {}
+        end
+
         UnloadBtn.MouseButton1Click:Connect(function()
             getgenv().EW_RUNNING = false 
-            task.wait(0.1)
-            FOVDraw:Remove()
-            for _, p in pairs(Players:GetPlayers()) do if p.Character and p.Character:FindFirstChild("EW_ESP") then p.Character.EW_ESP:Destroy() end end
+            task.wait(0.05)
+            ClearDrawings()
+            for _, p in pairs(Players:GetPlayers()) do 
+                if p.Character then 
+                    local h = p.Character:FindFirstChild("EW_ESP") or CoreGui:FindFirstChild(p.Name.."_Highlight")
+                    if h then h:Destroy() end 
+                end 
+            end
             Gui:Destroy()
-            if LogService:FindFirstChild("EW_Watchdog_Active") then LogService.EW_Watchdog_Active:Destroy() end
+            local dog = LogService:FindFirstChild("EW_Watchdog_Active")
+            if dog then dog:Destroy() end
         end)
 
+        -- Skeleton Construct Generator
+        local BoneStructure = {
+            {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
+            {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
+            {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"},
+            {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
+            {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}
+        }
+
+        local function CreateSkelCache(plr)
+            if Skeletons[plr] then return end
+            local lines = {}
+            for i = 1, #BoneStructure do
+                local l = Drawing.new("Line")
+                l.Thickness = 2
+                l.Color = Color3.fromRGB(255, 255, 255)
+                l.Visible = false
+                table.insert(lines, l)
+            end
+            Skeletons[plr] = lines
+        end
+
         local MainLoop; MainLoop = RunService.RenderStepped:Connect(function()
-            if not getgenv().EW_RUNNING then MainLoop:Disconnect() return end
+            if not getgenv().EW_RUNNING then 
+                MainLoop:Disconnect() 
+                ClearDrawings()
+                return 
+            end
+            
             local Camera = workspace.CurrentCamera
             if not Camera then return end
 
-            FOVDraw.Thickness = 2; FOVDraw.Color = Color3.fromRGB(245, 169, 184); FOVDraw.Radius = getgenv().Settings.FOV; FOVDraw.Position = UserInputService:GetMouseLocation(); FOVDraw.Visible = getgenv().Settings.ShowFOV
+            local mouseLoc = UserInputService:GetMouseLocation()
+            FOVDraw.Thickness = 2
+            FOVDraw.Color = Color3.fromRGB(245, 169, 184)
+            FOVDraw.Radius = getgenv().Settings.FOV
+            FOVDraw.Position = mouseLoc
+            FOVDraw.Visible = getgenv().Settings.ShowFOV
             
             for _, p in pairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and p.Character then
-                    local h = p.Character:FindFirstChild("EW_ESP")
-                    if getgenv().Settings.ESP then
-                        if not h then h = Instance.new("Highlight", p.Character); h.Name = "EW_ESP"; h.FillColor = Color3.fromRGB(245, 169, 184); h.OutlineColor = Color3.new(1,1,1) end
-                    elseif h then h:Destroy() end
+                if p ~= LocalPlayer then
+                    -- Highlight Visual Framework Fix
+                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local h = p.Character:FindFirstChild("EW_ESP")
+                        if getgenv().Settings.ESP then
+                            if not h then 
+                                h = Instance.new("Highlight")
+                                h.Name = "EW_ESP"
+                                h.FillColor = Color3.fromRGB(245, 169, 184)
+                                h.OutlineColor = Color3.new(1,1,1)
+                                h.Parent = p.Character
+                            end
+                        else
+                            if h then h:Destroy() end
+                        end
+
+                        -- Skeleton Render Implementation
+                        if getgenv().Settings.SkeletonESP then
+                            CreateSkelCache(p)
+                            local cache = Skeletons[p]
+                            local char = p.Character
+                            
+                            for idx, bone in ipairs(BoneStructure) do
+                                local b1, b2 = char:FindFirstChild(bone[1]), char:FindFirstChild(bone[2])
+                                local line = cache[idx]
+                                if b1 and b2 and line then
+                                    local wPos1, vis1 = Camera:WorldToViewportPoint(b1.Position)
+                                    local wPos2, vis2 = Camera:WorldToViewportPoint(b2.Position)
+                                    if vis1 and vis2 then
+                                        line.From = Vector2.new(wPos1.X, wPos1.Y)
+                                        line.To = Vector2.new(wPos2.X, wPos2.Y)
+                                        line.Visible = true
+                                    else
+                                        line.Visible = false
+                                    end
+                                elseif line then
+                                    line.Visible = false
+                                end
+                            end
+                        else
+                            if Skeletons[p] then
+                                for _, line in pairs(Skeletons[p]) do line.Visible = false end
+                            end
+                        end
+                    else
+                        if Skeletons[p] then
+                            for _, line in pairs(Skeletons[p]) do line.Visible = false end
+                        end
+                    end
                 end
             end
 
+            -- Aimlock Calculation Logic Fix
             if getgenv().Settings.SnapAim and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-                local target, d = nil, getgenv().Settings.FOV
+                local target, closestDist = nil, getgenv().Settings.FOV
                 for _, p in pairs(Players:GetPlayers()) do
                     if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
                         local pos, vis = Camera:WorldToViewportPoint(p.Character.Head.Position)
                         if vis then
-                            local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
-                            if mag < d then d = mag; target = p.Character.Head end
+                            local mag = (Vector2.new(pos.X, pos.Y) - mouseLoc).Magnitude
+                            if mag < closestDist then closestDist = mag; target = p.Character.Head end
                         end
                     end
                 end
-                if target and mousemoverel then
+                
+                -- Global Pointer Input Check
+                local mouseMove = mousemoverel or (Input and Input.MouseMove) or (syn and syn.mousemoverel)
+                if target and mouseMove then
                     local tPos = Camera:WorldToViewportPoint(target.Position)
-                    local mPos = UserInputService:GetMouseLocation()
                     local s = getgenv().Settings.Blatant and 1 or (getgenv().Settings.Smoothing / 100)
-                    mousemoverel((tPos.X - mPos.X) * s, (tPos.Y - mPos.Y) * s)
+                    mouseMove((tPos.X - mouseLoc.X) * s, (tPos.Y - mouseLoc.Y) * s)
                 end
             end
         end)
@@ -217,7 +326,8 @@ if not LogService:FindFirstChild("EW_Watchdog_Active") then
     local WTag = Instance.new("BoolValue", LogService); WTag.Name = "EW_Watchdog_Active"
     task.spawn(function()
         while getgenv().EW_RUNNING do
-            if not CoreGui:FindFirstChild("EstrogenWare") and getgenv().EW_RUNNING then
+            local TargetFolder = game:GetService("Players").LocalPlayer:ToDataKeep() or game:GetService("CoreGui")
+            if not TargetFolder:FindFirstChild("EstrogenWare") and getgenv().EW_RUNNING then
                 pcall(RunSource)
             end
             task.wait(3)
