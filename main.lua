@@ -20,13 +20,18 @@ getgenv().EW_RUNNING = nil
 task.wait(0.05)
 getgenv().EW_RUNNING = true
 
--- Updated configuration schema to store target parts, themes, and colors
-getgenv().Settings = getgenv().Settings or {
+-- Freshly reset and rebuild settings schema to guarantee persistent states between teleportations/game instances
+local DefaultSettings = {
     SnapAim = false, ShowFOV = true, Blatant = false, ESP = false, SkeletonESP = false, TeamCheck = true,
     FOV = 150, Smoothing = 15, ActiveTheme = "Original", 
     CustomColor = Color3.fromRGB(91, 206, 250), CustomColor2 = Color3.fromRGB(245, 169, 184),
     LockPart = "Head"
 }
+
+getgenv().Settings = {}
+for k, v in pairs(DefaultSettings) do
+    getgenv().Settings[k] = v
+end
 
 -- Safe custom serialization system to handle nested elements like Color3
 local function SaveConfig(n)
@@ -49,9 +54,10 @@ end
 local function LoadConfig(n)
     local p = n or "EW_Last_Config.json"
     pcall(function()
+        if isfile and not isfile(p) then return end
         if readfile then
             local content = readfile(p)
-            if content then
+            if content and content ~= "" then
                 local data = HttpService:JSONDecode(content)
                 for k, v in pairs(data) do
                     if type(v) == "table" and #v == 3 then
@@ -65,7 +71,7 @@ local function LoadConfig(n)
     end)
 end
 
--- Pre-load saved configuration on script load
+-- Load the saved configuration on game launch/teleport
 LoadConfig()
 
 -- ==========================================
@@ -354,8 +360,32 @@ local CreateContainer = Instance.new("Frame", Configs); CreateContainer.Size = U
 local ConfigName = Instance.new("TextBox", CreateContainer); ConfigName.Size = UDim2.new(1, 0, 0, 35); ConfigName.PlaceholderText = "Config Name..."; ConfigName.Text = ""; ConfigName.Font = Enum.Font.RobotoMono; ConfigName.BorderSizePixel = 0; ThemeObjects[ConfigName] = "Button"
 local SaveBtn = Instance.new("TextButton", CreateContainer); SaveBtn.Size = UDim2.new(1, 0, 0, 35); SaveBtn.Position = UDim2.new(0, 0, 0, 40); SaveBtn.Text = "CREATE CONFIG"; SaveBtn.Font = Enum.Font.RobotoMono; SaveBtn.BorderSizePixel = 0; ThemeObjects[SaveBtn] = "Button"
 
-local TrackedConfigs = getgenv().EW_TrackedConfigs or {}
+-- Reconstruct active config file listing from local disk registry to survive server changes (Rivals Duels)
+local TrackedConfigs = {}
+pcall(function()
+    if isfile and isfile("EW_Configs_Registry.json") and readfile then
+        local content = readfile("EW_Configs_Registry.json")
+        if content and content ~= "" then
+            local list = HttpService:JSONDecode(content)
+            for _, file in ipairs(list) do
+                TrackedConfigs[file] = true
+            end
+        end
+    end
+end)
 getgenv().EW_TrackedConfigs = TrackedConfigs
+
+local function SaveRegistry()
+    pcall(function()
+        if writefile then
+            local list = {}
+            for file, _ in pairs(TrackedConfigs) do
+                table.insert(list, file)
+            end
+            writefile("EW_Configs_Registry.json", HttpService:JSONEncode(list))
+        end
+    end)
+end
 
 local function RefreshConfigs()
     for _, v in pairs(ConfigScroll:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
@@ -368,10 +398,24 @@ local function RefreshConfigs()
             LoadConfig(file)
             ApplyThemeData()
         end)
-        del.MouseButton1Click:Connect(function() pcall(function() if delfile then delfile(file) end end); TrackedConfigs[file] = nil; RefreshConfigs() end)
+        del.MouseButton1Click:Connect(function() 
+            pcall(function() if delfile then delfile(file) end end)
+            TrackedConfigs[file] = nil
+            SaveRegistry()
+            RefreshConfigs() 
+        end)
     end
 end
-SaveBtn.MouseButton1Click:Connect(function() if ConfigName.Text ~= "" then local fName = ConfigName.Text..".json"; SaveConfig(fName); TrackedConfigs[fName] = true; ConfigName.Text = ""; RefreshConfigs() end end)
+SaveBtn.MouseButton1Click:Connect(function() 
+    if ConfigName.Text ~= "" then 
+        local fName = ConfigName.Text..".json"
+        SaveConfig(fName)
+        TrackedConfigs[fName] = true
+        SaveRegistry()
+        ConfigName.Text = ""
+        RefreshConfigs() 
+    end 
+end)
 RefreshConfigs()
 
 local UnloadBtn = Instance.new("TextButton", Side); UnloadBtn.Size = UDim2.new(1, -10, 0, 45); UnloadBtn.Position = UDim2.new(0, 5, 1, -50); UnloadBtn.Text = "UNLOAD"; UnloadBtn.Font = Enum.Font.RobotoMono; UnloadBtn.BorderSizePixel = 0; ThemeObjects[UnloadBtn] = "Button"
@@ -651,10 +695,19 @@ CmdInput.FocusLost:Connect(function(enterPressed)
         task.wait(0.2)
         UnloadScript()
         task.spawn(function()
-            local autoexecPath = "Velocity\\AutoExec\\estrogenware.lua"
-            if readfile and pcall(function() return readfile(autoexecPath) end) then
-                loadstring(readfile(autoexecPath))()
-            else
+            local genericFallback = true
+            if readfile then
+                local localPaths = {"estrogenware.lua", "autoexec/estrogenware.lua"}
+                for _, path in ipairs(localPaths) do
+                    local success, scriptContent = pcall(readfile, path)
+                    if success and scriptContent then
+                        loadstring(scriptContent)()
+                        genericFallback = false
+                        break
+                    end
+                end
+            end
+            if genericFallback then
                 loadstring(game:HttpGet("https://raw.githubusercontent.com/ivymroow/EstrogenWare/main/source.lua", true))()
             end
         end)
