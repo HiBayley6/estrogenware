@@ -119,6 +119,7 @@ Main.Position = UDim2.new(1, -540, 0, 40)
 Main.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 Main.BorderSizePixel = 0
 Main.Active = true
+Main.Visible = false
 MakeDraggable(Main)
 
 -- Standalone Console Frame (Bottom-Left)
@@ -138,17 +139,57 @@ ConMain.Active = true
 ConMain.Visible = false
 MakeDraggable(ConMain)
 
+-- Forward declared & defined Console Header Label before themes configuration
+local ConsoleHeaderLabel = Instance.new("TextLabel", ConMain)
+ConsoleHeaderLabel.Size = UDim2.new(1, -10, 0, 20)
+ConsoleHeaderLabel.Position = UDim2.new(0, 5, 0, 2)
+ConsoleHeaderLabel.BackgroundTransparency = 1
+ConsoleHeaderLabel.Text = "> EstrogenWare Console by ivymroow :3"
+ConsoleHeaderLabel.Font = Enum.Font.RobotoMono
+ConsoleHeaderLabel.TextSize = 12
+ConsoleHeaderLabel.TextColor3 = Color3.fromRGB(245, 169, 184)
+ConsoleHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
+
 -- ==========================================
 -- THEME SYSTEM CONFIGURATOR
 -- ==========================================
 local ThemeObjects = {}
 local Side = Instance.new("Frame", Main); Side.Name = "Side"; Side.Size = UDim2.new(0, 140, 1, 0); Side.BackgroundColor3 = Color3.new(1,1,1); Side.BorderSizePixel = 0
 
+-- STREAMING_CHUNK:Configuring the dual-theme contrast engine and text-sync algorithms...
 local function ApplyThemeData()
     local mode = getgenv().Settings.ActiveTheme or "Original"
     local customClr = getgenv().Settings.CustomColor or Color3.fromRGB(91, 206, 250)
     local customClr2 = getgenv().Settings.CustomColor2 or Color3.fromRGB(245, 169, 184)
     
+    -- Generate colorways optimized for contrast on varying console background formats
+    local consoleTextNormal, consoleTextHighlight
+    if mode == "Original" then
+        consoleTextNormal = Color3.fromRGB(45, 52, 64)       -- Soft charcoal
+        consoleTextHighlight = Color3.fromRGB(220, 80, 130)   -- Distinct dark rose
+    elseif mode == "Simple" then
+        consoleTextNormal = Color3.fromRGB(220, 225, 230)     -- Crisp white/grey
+        consoleTextHighlight = Color3.fromRGB(91, 206, 250)    -- Neon sky blue
+    elseif mode == "Custom" then
+        local avgR = (customClr.R + customClr2.R) / 2
+        local avgG = (customClr.G + customClr2.G) / 2
+        local avgB = (customClr.B + customClr2.B) / 2
+        local lum = 0.299 * avgR + 0.587 * avgG + 0.114 * avgB
+        
+        if lum > 0.65 then
+            consoleTextNormal = Color3.fromRGB(30, 30, 30)       -- Light custom background -> dark text
+            consoleTextHighlight = Color3.fromRGB(150, 30, 100)   -- High-contrast dark violet magenta
+        else
+            consoleTextNormal = Color3.fromRGB(240, 240, 240)   -- Dark custom background -> light text
+            consoleTextHighlight = Color3.fromRGB(245, 169, 184) -- High-contrast pink/pastel
+        end
+    end
+
+    -- Synchronize standalone console header with nil-safe protection
+    if ConsoleHeaderLabel then
+        ConsoleHeaderLabel.TextColor3 = consoleTextHighlight
+    end
+
     for obj, typeInfo in pairs(ThemeObjects) do
         pcall(function()
             if typeInfo == "MainFrame" then
@@ -210,9 +251,14 @@ local function ApplyThemeData()
                     obj.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
                     obj.TextColor3 = Color3.fromRGB(240, 240, 240)
                 elseif mode == "Custom" then
-                    if obj:FindFirstChildOfClass("UIGradient") then obj:FindFirstChildOfClass("UIGradient"):Destroy() end
-                    obj.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                    obj.BackgroundColor3 = Color3.new(1,1,1)
                     obj.TextColor3 = Color3.fromRGB(30, 30, 30)
+                    local g = obj:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", obj)
+                    g.Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, customClr),
+                        ColorSequenceKeypoint.new(1, customClr2)
+                    })
+                    g.Rotation = 90
                 end
             elseif typeInfo == "Text" then
                 if mode == "Simple" then
@@ -220,6 +266,10 @@ local function ApplyThemeData()
                 else
                     obj.TextColor3 = Color3.fromRGB(30, 30, 30)
                 end
+            elseif typeInfo == "ConsoleText" then
+                obj.TextColor3 = consoleTextNormal
+            elseif typeInfo == "ConsoleTextHighlight" then
+                obj.TextColor3 = consoleTextHighlight
             end
         end)
     end
@@ -499,14 +549,15 @@ local LogBox = Instance.new("ScrollingFrame", ConMain); LogBox.Size = UDim2.new(
 local LogLayout = Instance.new("UIListLayout", LogBox); LogLayout.Padding = UDim.new(0, 2)
 local CmdInput = Instance.new("TextBox", ConMain); CmdInput.Size = UDim2.new(1, -10, 0, 25); CmdInput.Position = UDim2.new(0, 5, 1, -30); CmdInput.BackgroundColor3 = Color3.fromRGB(35, 35, 35); CmdInput.TextColor3 = Color3.new(1,1,1); CmdInput.PlaceholderText = "Enter command (unload, re-execute, panic)..."; CmdInput.Font = Enum.Font.RobotoMono; CmdInput.Text = ""; CmdInput.TextSize = 12; CmdInput.BorderSizePixel = 0
 
-local ConsoleHeaderLabel = Instance.new("TextLabel", ConMain); ConsoleHeaderLabel.Size = UDim2.new(1, -10, 0, 20); ConsoleHeaderLabel.Position = UDim2.new(0, 5, 0, 2); ConsoleHeaderLabel.BackgroundTransparency = 1; ConsoleHeaderLabel.Text = "> EstrogenWare Console by ivymroow :3"; ConsoleHeaderLabel.Font = Enum.Font.RobotoMono; ConsoleHeaderLabel.TextSize = 12; ConsoleHeaderLabel.TextColor3 = Color3.fromRGB(245, 169, 184); ConsoleHeaderLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local function LogToConsole(msg, clr)
-    local lbl = Instance.new("TextLabel", LogBox); lbl.Size = UDim2.new(1, 0, 0, 18); lbl.BackgroundTransparency = 1; lbl.TextColor3 = clr or Color3.new(1,1,1); lbl.Text = " > "..msg; lbl.Font = Enum.Font.RobotoMono; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left
+-- STREAMING_CHUNK:Refactoring the dynamic console logger structure...
+local function LogToConsole(msg, isHighlight)
+    local lbl = Instance.new("TextLabel", LogBox); lbl.Size = UDim2.new(1, 0, 0, 18); lbl.BackgroundTransparency = 1; lbl.Text = " > "..msg; lbl.Font = Enum.Font.RobotoMono; lbl.TextSize = 12; lbl.TextXAlignment = Enum.TextXAlignment.Left
+    ThemeObjects[lbl] = isHighlight and "ConsoleTextHighlight" or "ConsoleText"
     LogBox.CanvasPosition = Vector2.new(0, LogBox.AbsoluteCanvasSize.Y)
+    ApplyThemeData()
 end
 
-LogToConsole("System loop online.", Color3.fromRGB(91, 206, 250))
+LogToConsole("System loop online.", true)
 
 -- ==========================================
 -- ESP CORE ENGINE PROCEDURES
@@ -687,11 +738,11 @@ CmdInput.FocusLost:Connect(function(enterPressed)
     CmdInput.Text = ""
     
     if cmd == "unload" then
-        LogToConsole("Disconnecting script execution...", Color3.fromRGB(245, 169, 184))
+        LogToConsole("Disconnecting script execution...", true)
         task.wait(0.2)
         UnloadScript()
     elseif cmd == "re-execute" then
-        LogToConsole("Re-executing framework thread context...", Color3.fromRGB(91, 206, 250))
+        LogToConsole("Re-executing framework thread context...", true)
         task.wait(0.2)
         UnloadScript()
         task.spawn(function()
@@ -715,7 +766,7 @@ CmdInput.FocusLost:Connect(function(enterPressed)
         UnloadScript()
         LocalPlayer:Kick("panic kick")
     else
-        LogToConsole("Command unrecognized: '"..tostring(cmd).."'", Color3.fromRGB(255, 100, 100))
+        LogToConsole("Command unrecognized: '"..tostring(cmd).."'", true)
     end
 end)
 
